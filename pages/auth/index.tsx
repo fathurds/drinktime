@@ -10,9 +10,10 @@ import {
 import { ButtonAuth, Copyright, AuthComponent } from "../../components";
 import Image from "next/image";
 import logo from "../../assets/images/logo/logo-drinktime.png";
-import axios from "axios";
 import CloseIcon from "@mui/icons-material/Close";
 import { useRouter } from "next/router";
+import { setLogin, setSignUp } from "../../services/auth";
+import Cookies from "js-cookie";
 
 export default function SignUp() {
   const [isLoading, setIsLoading] = useState(false);
@@ -26,53 +27,37 @@ export default function SignUp() {
 
   const router = useRouter();
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
 
     const body = {
-      username: usernameRef.current?.value,
-      password: passwordRef.current?.value,
+      username: usernameRef.current?.value!,
+      password: passwordRef.current?.value!,
     };
 
     if (path === "Sign Up") {
-      const bodySignUp = { ...body, name: nameRef.current?.value };
+      const bodySignUp = { ...body, name: nameRef.current?.value! };
 
-      axios
-        .post("https://drinktime-server.herokuapp.com/auth/signup", bodySignUp)
-        .then(() => {
-          setPath("Login");
-          setMessage("");
-        })
-        .catch((err) => {
-          const msg = err.response.data.message
-            .split("failed: ")
-            .pop()
-            .replace("username: ", "")
-            .replace("password: ", "")
-            .replace("name: ", "");
-
-          setMessage(msg);
-        })
-        .finally(() => setIsLoading(false));
+      const response = await setSignUp(bodySignUp); // API SIGNUP
+      if (response.error) {
+        setMessage(response.message);
+      } else {
+        setPath("Login");
+        setMessage("");
+      }
     } else {
-      axios
-        .post("https://drinktime-server.herokuapp.com/auth/signin", body)
-        .then((data) => {
-          console.log(data.data.data.token);
-          router.push("/");
-        })
-        .catch((err) => {
-          const msg = err.response.data.message
-            .split("failed: ")
-            .pop()
-            .replace("username: ", "")
-            .replace("password: ", "");
-
-          setMessage(msg);
-        })
-        .finally(() => setIsLoading(false));
+      const response = await setLogin(body); // API SIGNIN
+      if (response.error) {
+        setMessage(response.message);
+      } else {
+        const { token } = response.data;
+        const tokenBase64 = btoa(token);
+        Cookies.set("token", tokenBase64, { expires: 1 });
+        router.push("/");
+      }
     }
+    setIsLoading(false);
   };
 
   const onClickPath = (text: string) => {
